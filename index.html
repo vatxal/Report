@@ -1,0 +1,421 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Image + Notes Excel Generator</title>
+
+  <!-- SheetJS -->
+  <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
+
+  <!-- ExcelJS -->
+  <script src="https://cdn.jsdelivr.net/npm/exceljs/dist/exceljs.min.js"></script>
+
+  <!-- File Saver -->
+  <script src="https://cdn.jsdelivr.net/npm/file-saver/dist/FileSaver.min.js"></script>
+
+  <style>
+    *{
+      box-sizing:border-box;
+      margin:0;
+      padding:0;
+      font-family:Arial, sans-serif;
+    }
+
+    body{
+      background:#f4f4f4;
+      padding:20px;
+    }
+
+    .container{
+      max-width:1200px;
+      margin:auto;
+    }
+
+    .top-bar{
+      display:flex;
+      justify-content:space-between;
+      align-items:center;
+      flex-wrap:wrap;
+      gap:10px;
+      margin-bottom:20px;
+    }
+
+    h1{
+      font-size:28px;
+      color:#222;
+    }
+
+    .project-actions{
+      display:flex;
+      gap:10px;
+      flex-wrap:wrap;
+    }
+
+    button{
+      padding:12px 18px;
+      border:none;
+      border-radius:10px;
+      cursor:pointer;
+      font-size:15px;
+      font-weight:bold;
+    }
+
+    .primary{
+      background:#007bff;
+      color:white;
+    }
+
+    .secondary{
+      background:#28a745;
+      color:white;
+    }
+
+    .danger{
+      background:#dc3545;
+      color:white;
+    }
+
+    .row-card{
+      background:white;
+      padding:18px;
+      border-radius:16px;
+      margin-bottom:20px;
+      box-shadow:0 2px 8px rgba(0,0,0,0.08);
+    }
+
+    .row-grid{
+      display:grid;
+      grid-template-columns:1fr 1fr;
+      gap:20px;
+    }
+
+    .upload-section,
+    .note-section{
+      display:flex;
+      flex-direction:column;
+      gap:10px;
+    }
+
+    .preview{
+      width:100%;
+      max-height:350px;
+      object-fit:contain;
+      border-radius:10px;
+      border:1px solid #ddd;
+      background:#fafafa;
+    }
+
+    textarea{
+      width:100%;
+      min-height:250px;
+      padding:12px;
+      border-radius:10px;
+      border:1px solid #ccc;
+      resize:vertical;
+      font-size:15px;
+    }
+
+    .buttons{
+      display:flex;
+      gap:12px;
+      margin-top:20px;
+      flex-wrap:wrap;
+    }
+
+    .empty-preview{
+      height:250px;
+      border:2px dashed #ccc;
+      border-radius:10px;
+      display:flex;
+      justify-content:center;
+      align-items:center;
+      color:#888;
+      background:#fafafa;
+    }
+
+    @media(max-width:768px){
+      .row-grid{
+        grid-template-columns:1fr;
+      }
+
+      h1{
+        font-size:22px;
+      }
+
+      button{
+        width:100%;
+      }
+
+      .project-actions{
+        width:100%;
+      }
+    }
+  </style>
+</head>
+<body>
+
+<div class="container">
+
+  <div class="top-bar">
+    <h1>Excel Project Builder</h1>
+
+    <div class="project-actions">
+      <button class="secondary" onclick="continueProject()">Continue Previous Project</button>
+      <button class="danger" onclick="newProject()">Create New Project</button>
+    </div>
+  </div>
+
+  <div id="rowsContainer"></div>
+
+  <div class="buttons">
+    <button class="primary" onclick="addRow()">Add</button>
+    <button class="secondary" onclick="generateExcel()">Submit</button>
+  </div>
+
+</div>
+
+<script>
+
+let rowsData = [];
+
+function cmToPixels(cm){
+  return cm * 37.795275591;
+}
+
+function cmToExcelWidth(cm){
+  return cm * 5.2;
+}
+
+function cmToPoints(cm){
+  return cm * 28.3465;
+}
+
+function saveProject(){
+  localStorage.setItem("excelProjectData", JSON.stringify(rowsData));
+}
+
+function newProject(){
+  if(confirm("Start a new project? Current unsaved data will be cleared.")){
+    rowsData = [];
+    saveProject();
+    renderRows();
+  }
+}
+
+function continueProject(){
+  const saved = localStorage.getItem("excelProjectData");
+
+  if(saved){
+    rowsData = JSON.parse(saved);
+    renderRows();
+  }else{
+    alert("No previous project found.");
+  }
+}
+
+function addRow(){
+  rowsData.push({
+    image:"",
+    note:""
+  });
+
+  saveProject();
+  renderRows();
+}
+
+function updateNote(index, value){
+  rowsData[index].note = value;
+  saveProject();
+}
+
+function handleImage(event, index){
+
+  const file = event.target.files[0];
+  if(!file) return;
+
+  const reader = new FileReader();
+
+  reader.onload = function(e){
+    rowsData[index].image = e.target.result;
+    saveProject();
+    renderRows();
+  }
+
+  reader.readAsDataURL(file);
+}
+
+function renderRows(){
+
+  const container = document.getElementById("rowsContainer");
+  container.innerHTML = "";
+
+  rowsData.forEach((row, index)=>{
+
+    const div = document.createElement("div");
+    div.className = "row-card";
+
+    div.innerHTML = `
+      <div class="row-grid">
+
+        <div class="upload-section">
+          <label><strong>Upload / Take Picture</strong></label>
+
+          <input 
+            type="file" 
+            accept="image/*" 
+            capture="environment"
+            onchange="handleImage(event, ${index})"
+          />
+
+          ${
+            row.image
+            ? `<img src="${row.image}" class="preview"/>`
+            : `<div class="empty-preview">No Image Selected</div>`
+          }
+        </div>
+
+        <div class="note-section">
+          <label><strong>Notes</strong></label>
+
+          <textarea 
+            placeholder="Write notes here..."
+            oninput="updateNote(${index}, this.value)"
+          >${row.note || ""}</textarea>
+        </div>
+
+      </div>
+    `;
+
+    container.appendChild(div);
+
+  });
+
+}
+
+async function generateExcel(){
+
+  if(rowsData.length === 0){
+    alert("Please add at least one row.");
+    return;
+  }
+
+  const workbook = new ExcelJS.Workbook();
+  const worksheet = workbook.addWorksheet("Project");
+
+  // Column widths = 15 cm
+  worksheet.getColumn(1).width = cmToExcelWidth(15);
+  worksheet.getColumn(2).width = cmToExcelWidth(15);
+
+  for(let i=0; i<rowsData.length; i++){
+
+    const rowIndex = i + 1;
+
+    // Row height = 20 cm
+    worksheet.getRow(rowIndex).height = cmToPoints(20);
+
+    const item = rowsData[i];
+
+    // Add Note
+    worksheet.getCell(`B${rowIndex}`).value = item.note || "";
+
+    worksheet.getCell(`B${rowIndex}`).alignment = {
+      wrapText:true,
+      vertical:"top",
+      horizontal:"left"
+    };
+
+    // Add Image
+    if(item.image){
+
+      const imageId = workbook.addImage({
+        base64:item.image,
+        extension:"png"
+      });
+
+      // Image width = 9 cm
+      const imageWidth = cmToPixels(9);
+
+      // Maintain aspect ratio
+      const img = new Image();
+      img.src = item.image;
+
+      await new Promise(resolve => {
+        img.onload = () => {
+
+          const ratio = img.height / img.width;
+          const imageHeight = imageWidth * ratio;
+
+          worksheet.addImage(imageId, {
+            tl:{ col:0, row:rowIndex - 1 },
+            ext:{
+              width:imageWidth,
+              height:imageHeight
+            }
+          });
+
+          resolve();
+        }
+      });
+
+    }
+
+  }
+
+  // Borders
+  worksheet.eachRow((row)=>{
+    row.eachCell((cell)=>{
+      cell.border = {
+        top:{style:'thin'},
+        left:{style:'thin'},
+        bottom:{style:'thin'},
+        right:{style:'thin'}
+      };
+    });
+  });
+
+  const buffer = await workbook.xlsx.writeBuffer();
+
+  saveAs(
+    new Blob([buffer], {
+      type:"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    }),
+    "Project.xlsx"
+  );
+
+  alert("Excel file generated successfully!");
+
+}
+
+// Auto load previous project if available
+window.onload = () => {
+
+  const saved = localStorage.getItem("excelProjectData");
+
+  if(saved){
+    const shouldLoad = confirm(
+      "Previous project found.\n\nDo you want to continue working on it?"
+    );
+
+    if(shouldLoad){
+      rowsData = JSON.parse(saved);
+    }else{
+      rowsData = [];
+    }
+
+  }else{
+    rowsData = [];
+  }
+
+  if(rowsData.length === 0){
+    addRow();
+  }else{
+    renderRows();
+  }
+
+};
+
+</script>
+
+</body>
+</html>
