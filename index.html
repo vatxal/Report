@@ -1,0 +1,446 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+
+<title>Image + Notes Excel Generator</title>
+
+<script src="https://cdn.jsdelivr.net/npm/exceljs/dist/exceljs.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/file-saver/dist/FileSaver.min.js"></script>
+
+<style>
+    *{
+        box-sizing:border-box;
+        font-family:Arial, sans-serif;
+    }
+
+    body{
+        margin:0;
+        background:#f4f4f4;
+        padding:15px;
+    }
+
+    h1{
+        text-align:center;
+        margin-bottom:20px;
+    }
+
+    button{
+        padding:12px 18px;
+        border:none;
+        border-radius:10px;
+        background:#007bff;
+        color:white;
+        font-size:16px;
+        cursor:pointer;
+    }
+
+    button:hover{
+        opacity:0.9;
+    }
+
+    .row-card{
+        background:white;
+        padding:15px;
+        border-radius:14px;
+        margin-bottom:20px;
+        box-shadow:0 2px 10px rgba(0,0,0,0.1);
+    }
+
+    .content-row{
+        display:flex;
+        gap:15px;
+        flex-wrap:wrap;
+    }
+
+    .left,
+    .right{
+        flex:1;
+        min-width:280px;
+    }
+
+    .preview{
+        width:100%;
+        max-height:300px;
+        object-fit:contain;
+        border-radius:10px;
+        border:1px solid #ddd;
+        margin-top:10px;
+        background:#fafafa;
+    }
+
+    textarea{
+        width:100%;
+        min-height:220px;
+        padding:12px;
+        border-radius:10px;
+        border:1px solid #ccc;
+        resize:vertical;
+        font-size:16px;
+    }
+
+    input[type="file"]{
+        width:100%;
+    }
+
+    .footer-buttons{
+        display:flex;
+        justify-content:center;
+        gap:15px;
+        margin-top:25px;
+        flex-wrap:wrap;
+    }
+
+    .modal{
+        position:fixed;
+        inset:0;
+        background:rgba(0,0,0,0.6);
+        display:flex;
+        align-items:center;
+        justify-content:center;
+        z-index:1000;
+    }
+
+    .modal-content{
+        background:white;
+        padding:25px;
+        border-radius:14px;
+        text-align:center;
+        width:90%;
+        max-width:400px;
+    }
+
+    .modal-content button{
+        margin-top:15px;
+        width:100%;
+    }
+
+    @media(max-width:768px){
+
+        textarea{
+            min-height:160px;
+        }
+    }
+</style>
+</head>
+
+<body>
+
+<div id="startupModal" class="modal">
+    <div class="modal-content">
+        <h2>Choose Option</h2>
+
+        <button onclick="continueProject()">
+            Continue Previous Project
+        </button>
+
+        <button onclick="newProject()">
+            Create New Project
+        </button>
+    </div>
+</div>
+
+<h1>Excel Report Creator</h1>
+
+<div id="rowsContainer"></div>
+
+<div class="footer-buttons">
+    <button onclick="addRow()">Add</button>
+    <button onclick="generateExcel()">Submit</button>
+</div>
+
+<script>
+
+let projectData = [];
+
+function saveProject(){
+
+    localStorage.setItem(
+        "excel_project_data",
+        JSON.stringify(projectData)
+    );
+}
+
+function continueProject(){
+
+    const saved = localStorage.getItem("excel_project_data");
+
+    if(saved){
+
+        projectData = JSON.parse(saved);
+
+        projectData.forEach(data=>{
+            createRow(data);
+        });
+
+    }else{
+
+        addRow();
+    }
+
+    document.getElementById("startupModal").style.display="none";
+}
+
+function newProject(){
+
+    localStorage.removeItem("excel_project_data");
+
+    projectData = [];
+
+    document.getElementById("rowsContainer").innerHTML = "";
+
+    addRow();
+
+    document.getElementById("startupModal").style.display="none";
+}
+
+function addRow(){
+
+    const rowData = {
+        image:null,
+        note:""
+    };
+
+    projectData.push(rowData);
+
+    createRow(rowData);
+
+    saveProject();
+}
+
+function createRow(data){
+
+    const index = projectData.indexOf(data);
+
+    const card = document.createElement("div");
+
+    card.className = "row-card";
+
+    card.innerHTML = `
+        <div class="content-row">
+
+            <div class="left">
+
+                <label>
+                    <b>Upload / Take Picture</b>
+                </label>
+
+                <input 
+                    type="file" 
+                    accept="image/*" 
+                    capture="environment"
+                >
+
+                <img 
+                    class="preview"
+                    src="${data.image || ''}"
+                    style="${data.image ? '' : 'display:none'}"
+                >
+
+            </div>
+
+            <div class="right">
+
+                <label>
+                    <b>Notes</b>
+                </label>
+
+                <textarea 
+                    placeholder="Write notes here..."
+                >${data.note || ''}</textarea>
+
+            </div>
+
+        </div>
+    `;
+
+    const fileInput = card.querySelector("input");
+
+    const preview = card.querySelector(".preview");
+
+    const textarea = card.querySelector("textarea");
+
+    fileInput.addEventListener("change",(e)=>{
+
+        const file = e.target.files[0];
+
+        if(!file) return;
+
+        const reader = new FileReader();
+
+        reader.onload = function(evt){
+
+            preview.src = evt.target.result;
+
+            preview.style.display = "block";
+
+            projectData[index].image = evt.target.result;
+
+            saveProject();
+        };
+
+        reader.readAsDataURL(file);
+    });
+
+    textarea.addEventListener("input",(e)=>{
+
+        projectData[index].note = e.target.value;
+
+        saveProject();
+    });
+
+    document
+        .getElementById("rowsContainer")
+        .appendChild(card);
+}
+
+async function processImage(base64){
+
+    return new Promise((resolve)=>{
+
+        const img = new Image();
+
+        img.onload = function(){
+
+            // Approx 10cm width
+            const targetWidth = 378;
+
+            // Approx 17cm max height
+            const maxHeight = 643;
+
+            const scale = targetWidth / img.width;
+
+            let scaledHeight = img.height * scale;
+
+            let cropHeight = scaledHeight;
+
+            if(scaledHeight > maxHeight){
+
+                cropHeight = maxHeight;
+            }
+
+            const canvas = document.createElement("canvas");
+
+            canvas.width = targetWidth;
+
+            canvas.height = cropHeight;
+
+            const ctx = canvas.getContext("2d");
+
+            // Draw from top-left
+            ctx.drawImage(
+                img,
+                0,
+                0,
+                img.width,
+                img.height,
+                0,
+                0,
+                targetWidth,
+                scaledHeight
+            );
+
+            // Crop from top
+            const cropped = ctx.getImageData(
+                0,
+                0,
+                targetWidth,
+                cropHeight
+            );
+
+            canvas.height = cropHeight;
+
+            ctx.putImageData(cropped,0,0);
+
+            resolve(
+                canvas.toDataURL("image/jpeg",0.9)
+            );
+        };
+
+        img.src = base64;
+    });
+}
+
+async function generateExcel(){
+
+    const workbook = new ExcelJS.Workbook();
+
+    const worksheet = workbook.addWorksheet("Report");
+
+    // Approx 15cm width
+    worksheet.getColumn(1).width = 85;
+
+    worksheet.getColumn(2).width = 85;
+
+    for(let i=0;i<projectData.length;i++){
+
+        const rowNumber = i + 1;
+
+        const item = projectData[i];
+
+        // Slightly larger row height
+        worksheet.getRow(rowNumber).height = 590;
+
+        // Align cells top-left
+        worksheet.getCell(`A${rowNumber}`).alignment = {
+            vertical:"top",
+            horizontal:"left"
+        };
+
+        worksheet.getCell(`B${rowNumber}`).alignment = {
+            vertical:"top",
+            horizontal:"left",
+            wrapText:true
+        };
+
+        // Add note
+        worksheet.getCell(`B${rowNumber}`).value = item.note;
+
+        if(item.image){
+
+            const processedImage = await processImage(item.image);
+
+            const imageId = workbook.addImage({
+                base64:processedImage,
+                extension:'jpeg'
+            });
+
+            worksheet.addImage(imageId,{
+
+                // EXACT top-left alignment
+                tl:{
+                    col:0,
+                    row:rowNumber - 1
+                },
+
+                // Slightly reduced dimensions
+                ext:{
+                    width:360,
+                    height:610
+                },
+
+                editAs:'oneCell'
+            });
+        }
+    }
+
+    const buffer = await workbook.xlsx.writeBuffer();
+
+    saveAs(
+
+        new Blob(
+            [buffer],
+            {
+                type:"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+            }
+        ),
+
+        "Report.xlsx"
+    );
+}
+
+</script>
+
+</body>
+</html>
