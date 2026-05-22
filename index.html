@@ -1,0 +1,500 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+
+  <title>ExcelJS Image Notes Generator</title>
+
+  <script src="https://cdn.jsdelivr.net/npm/exceljs/dist/exceljs.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/file-saver/dist/FileSaver.min.js"></script>
+
+  <style>
+
+    *{
+      box-sizing:border-box;
+      margin:0;
+      padding:0;
+      font-family:Arial,sans-serif;
+    }
+
+    body{
+      background:#f3f4f6;
+      padding:15px;
+    }
+
+    .hidden{
+      display:none;
+    }
+
+    /* STARTUP */
+
+    .startup-screen{
+      position:fixed;
+      inset:0;
+      background:white;
+      display:flex;
+      justify-content:center;
+      align-items:center;
+      z-index:999;
+    }
+
+    .startup-box{
+      width:90%;
+      max-width:400px;
+      background:white;
+      padding:30px;
+      border-radius:18px;
+      box-shadow:0 4px 18px rgba(0,0,0,0.1);
+      text-align:center;
+    }
+
+    .startup-box h1{
+      margin-bottom:20px;
+    }
+
+    .startup-box button{
+      width:100%;
+      padding:15px;
+      margin-top:12px;
+      border:none;
+      border-radius:12px;
+      background:#2563eb;
+      color:white;
+      font-size:16px;
+      cursor:pointer;
+    }
+
+    /* MAIN */
+
+    .container{
+      max-width:1200px;
+      margin:auto;
+    }
+
+    .topbar{
+      display:flex;
+      justify-content:space-between;
+      align-items:center;
+      flex-wrap:wrap;
+      gap:10px;
+      margin-bottom:20px;
+    }
+
+    .topbar-buttons{
+      display:flex;
+      gap:10px;
+      flex-wrap:wrap;
+    }
+
+    .topbar button{
+      border:none;
+      padding:12px 18px;
+      border-radius:10px;
+      background:#2563eb;
+      color:white;
+      font-size:15px;
+      cursor:pointer;
+    }
+
+    .row-card{
+      background:white;
+      border-radius:16px;
+      padding:15px;
+      margin-bottom:20px;
+      box-shadow:0 3px 12px rgba(0,0,0,0.08);
+    }
+
+    .row-layout{
+      display:flex;
+      gap:15px;
+    }
+
+    .left-section,
+    .right-section{
+      flex:1;
+    }
+
+    .image-preview{
+      width:100%;
+      height:320px;
+      object-fit:contain;
+      border:1px solid #ddd;
+      border-radius:10px;
+      background:#fafafa;
+    }
+
+    .file-input{
+      width:100%;
+      margin-top:10px;
+    }
+
+    textarea{
+      width:100%;
+      min-height:320px;
+      resize:vertical;
+      padding:12px;
+      border-radius:10px;
+      border:1px solid #ccc;
+      font-size:15px;
+      line-height:1.5;
+    }
+
+    @media(max-width:768px){
+
+      .row-layout{
+        flex-direction:column;
+      }
+
+      textarea{
+        min-height:180px;
+      }
+
+    }
+
+  </style>
+</head>
+
+<body>
+
+  <!-- START SCREEN -->
+
+  <div class="startup-screen" id="startupScreen">
+
+    <div class="startup-box">
+
+      <h1>Project</h1>
+
+      <button id="continueBtn">
+        Continue Previous Project
+      </button>
+
+      <button id="newBtn">
+        Create New Project
+      </button>
+
+    </div>
+
+  </div>
+
+  <!-- MAIN -->
+
+  <div class="container hidden" id="mainContainer">
+
+    <div class="topbar">
+
+      <h2>Excel Image Notes Generator</h2>
+
+      <div class="topbar-buttons">
+
+        <button id="addBtn">Add</button>
+
+        <button id="submitBtn">Submit</button>
+
+      </div>
+
+    </div>
+
+    <div id="rowsContainer"></div>
+
+  </div>
+
+  <script>
+
+    const startupScreen = document.getElementById("startupScreen");
+    const mainContainer = document.getElementById("mainContainer");
+
+    const continueBtn = document.getElementById("continueBtn");
+    const newBtn = document.getElementById("newBtn");
+
+    const rowsContainer = document.getElementById("rowsContainer");
+
+    const addBtn = document.getElementById("addBtn");
+    const submitBtn = document.getElementById("submitBtn");
+
+    let projectData = [];
+
+    /* SAVE */
+
+    function saveProject(){
+
+      localStorage.setItem(
+        "exceljs_project",
+        JSON.stringify(projectData)
+      );
+    }
+
+    /* LOAD */
+
+    function loadProject(){
+
+      const saved = localStorage.getItem("exceljs_project");
+
+      if(saved){
+
+        projectData = JSON.parse(saved);
+
+        rowsContainer.innerHTML = "";
+
+        const temp = [...projectData];
+
+        projectData = [];
+
+        temp.forEach(item => {
+
+          createRow(item.image, item.note);
+
+        });
+
+      }
+    }
+
+    /* CREATE ROW */
+
+    function createRow(imageSrc = "", note = ""){
+
+      const index = projectData.length;
+
+      projectData.push({
+        image:imageSrc,
+        note:note
+      });
+
+      const card = document.createElement("div");
+
+      card.className = "row-card";
+
+      card.innerHTML = `
+
+        <div class="row-layout">
+
+          <div class="left-section">
+
+            <img class="image-preview"
+                 src="${imageSrc}" />
+
+            <input
+              type="file"
+              accept="image/*"
+              capture="environment"
+              class="file-input"
+            />
+
+          </div>
+
+          <div class="right-section">
+
+            <textarea
+              placeholder="Write notes here..."
+            >${note}</textarea>
+
+          </div>
+
+        </div>
+
+      `;
+
+      const img = card.querySelector(".image-preview");
+
+      const fileInput = card.querySelector(".file-input");
+
+      const textarea = card.querySelector("textarea");
+
+      /* IMAGE */
+
+      fileInput.addEventListener("change",(e)=>{
+
+        const file = e.target.files[0];
+
+        if(!file) return;
+
+        const reader = new FileReader();
+
+        reader.onload = function(event){
+
+          img.src = event.target.result;
+
+          projectData[index].image = event.target.result;
+
+          saveProject();
+        };
+
+        reader.readAsDataURL(file);
+
+      });
+
+      /* NOTE */
+
+      textarea.addEventListener("input",()=>{
+
+        projectData[index].note = textarea.value;
+
+        saveProject();
+      });
+
+      rowsContainer.appendChild(card);
+
+      saveProject();
+    }
+
+    /* NEW PROJECT */
+
+    newBtn.addEventListener("click",()=>{
+
+      localStorage.removeItem("exceljs_project");
+
+      projectData = [];
+
+      rowsContainer.innerHTML = "";
+
+      createRow();
+
+      startupScreen.classList.add("hidden");
+
+      mainContainer.classList.remove("hidden");
+    });
+
+    /* CONTINUE */
+
+    continueBtn.addEventListener("click",()=>{
+
+      startupScreen.classList.add("hidden");
+
+      mainContainer.classList.remove("hidden");
+
+      loadProject();
+
+      if(projectData.length === 0){
+        createRow();
+      }
+    });
+
+    /* ADD */
+
+    addBtn.addEventListener("click",()=>{
+
+      createRow();
+    });
+
+    /* EXPORT EXCEL */
+
+    submitBtn.addEventListener("click", async ()=>{
+
+      const workbook = new ExcelJS.Workbook();
+
+      const worksheet = workbook.addWorksheet("Sheet1");
+
+      /* COLUMN WIDTHS */
+
+      worksheet.getColumn(1).width = 60;
+      worksheet.getColumn(2).width = 60;
+
+      for(let i=0;i<projectData.length;i++){
+
+        const rowNumber = i + 1;
+
+        const item = projectData[i];
+
+        /* ROW HEIGHT */
+
+        worksheet.getRow(rowNumber).height = 567;
+
+        /* NOTE */
+
+        const noteCell = worksheet.getCell(`B${rowNumber}`);
+
+        noteCell.value = item.note || "";
+
+        noteCell.alignment = {
+          wrapText:true,
+          vertical:"top",
+          horizontal:"left"
+        };
+
+        /* IMAGE */
+
+        if(item.image){
+
+          const base64Data = item.image;
+
+          const extension = base64Data.substring(
+            "data:image/".length,
+            base64Data.indexOf(";base64")
+          );
+
+          const imageId = workbook.addImage({
+            base64:base64Data,
+            extension:extension
+          });
+
+          const img = new Image();
+
+          img.src = base64Data;
+
+          await new Promise(resolve => {
+
+            img.onload = ()=>{
+
+              /*
+                6cm width ≈ 227px
+              */
+
+              const targetWidth = 227;
+
+              const ratio = targetWidth / img.width;
+
+              const targetHeight = img.height * ratio;
+
+              worksheet.addImage(imageId,{
+
+                tl:{
+                  col:0,
+                  row:i
+                },
+
+                ext:{
+                  width:targetWidth,
+                  height:targetHeight
+                },
+
+                editAs:"oneCell"
+              });
+
+              resolve();
+            };
+
+          });
+
+        }
+
+      }
+
+      /* GENERATE FILE */
+
+      const buffer = await workbook.xlsx.writeBuffer();
+
+      saveAs(
+        new Blob([buffer]),
+        "Image_Notes.xlsx"
+      );
+
+    });
+
+    /* STARTUP */
+
+    window.onload = ()=>{
+
+      const saved = localStorage.getItem("exceljs_project");
+
+      if(!saved){
+
+        continueBtn.style.display = "none";
+      }
+
+    };
+
+  </script>
+
+</body>
+</html>
